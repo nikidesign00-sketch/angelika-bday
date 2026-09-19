@@ -3,7 +3,7 @@
 # Токен — от любого своего бота из @BotFather:
 #   TG_BOT_TOKEN=123456:ABC... ./fetch-stickers.sh
 set -euo pipefail
-: "${TG_BOT_TOKEN:?нужен TG_BOT_TOKEN}"
+[ -n "${TG_BOT_TOKEN:-}" ] || read -rsp "Токен бота из @BotFather: " TG_BOT_TOKEN; echo
 cd "$(dirname "$0")"
 API="https://api.telegram.org/bot$TG_BOT_TOKEN"
 
