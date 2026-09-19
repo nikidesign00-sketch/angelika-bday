@@ -120,42 +120,60 @@
     document.body.classList.add('cake');
     setTimeout(party, 600);
   }
-  balloons.addEventListener('ended', showCake);
+  // видео кончается на полной надписи — держим её секунду
+  balloons.addEventListener('ended', () => setTimeout(showCake, 1000));
 
   function start() {
     party();
     // автоплей запрещён (режим энергосбережения iOS) — сразу к торту
     balloons.play().catch(e => e.name == 'NotAllowedError' && showCake());
-    setTimeout(showCake, 5500);
+    setTimeout(showCake, 4500);
   }
   // в фоновой вкладке браузер ставит видео на паузу — ждём, пока её откроют
   if (document.visibilityState == 'visible') start();
   else document.addEventListener('visibilitychange', start, { once: true });
   addEventListener('click', party);
 </script>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
 <script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+  import * as THREE from 'three';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
   const TOPPER = 'cake/topper.png'; // картинка, которая выезжает из торта
   const TOPPER_H = 1;               // её высота
   const R = 1, H = .83;             // радиус и высота торта
+  const PINK = 0xe953b0;
 
   const canvas = document.getElementById('cake');
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.localClippingEnabled = true;
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(30, 1, .1, 50);
-  camera.position.set(0, 2.5, 4.6);
-  camera.lookAt(0, .45, 0);
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-  // свет: сверху-небо/снизу-тень, основной слева, розовая заливка справа, контровой сзади
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x2a0b3d, .5));
-  for (const [color, power, x, y, z] of [[0xffffff, 4, -3, 2.5, 3], [0xff9ad5, .6, 3.5, 1, 2], [0xffffff, 4, 0, 1.5, -4]]) {
-    const light = new THREE.DirectionalLight(color, power);
-    light.position.set(x, y, z);
-    scene.add(light);
-  }
+  const scene = new THREE.Scene();
+  // мягкий свет и отражения от «комнаты» — без него материалы выглядят пластиком
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture;
+  scene.environmentIntensity = .7;
+
+  const camera = new THREE.PerspectiveCamera(30, 1, .1, 50);
+  camera.position.set(0, 2.7, 5.4);
+  camera.lookAt(0, .35, 0);
+
+  const key = new THREE.DirectionalLight(0xffffff, 2.5);
+  key.position.set(-2.5, 4, 3);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: .5, far: 12 });
+  key.shadow.normalBias = .02;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0xffe0f2, 2);   // контровой сзади — светлая кромка
+  rim.position.set(0, 2, -4);
+  scene.add(rim);
 
   const loader = new THREE.TextureLoader();
   const tex = (url, onLoad) => {
@@ -167,6 +185,11 @@
 
   const cake = new THREE.Group();
   scene.add(cake);
+  const add = (mesh, cast = true, receive = true) => {
+    mesh.castShadow = cast; mesh.receiveShadow = receive;
+    cake.add(mesh);
+    return mesh;
+  };
 
   // творожный крем: розовая база, горизонтальные мазки лопатки и зерно.
   // relief — рельеф (серый), из него же подкрашивается цвет
@@ -215,7 +238,9 @@
     return { map, bump };
   }
   const { map, bump } = creamTextures();
-  const cream = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.5, roughness: .85 });
+  // sheen — бархатистый отлив, как у крема
+  const creamProps = { roughness: .8, sheen: 1, sheenColor: 0xffd0ea, sheenRoughness: .6 };
+  const cream = new THREE.MeshPhysicalMaterial({ map, bumpMap: bump, bumpScale: 1.5, ...creamProps });
 
   // бок: профиль со скруглённым верхним краем, вращённый вокруг оси
   const rr = .08, profile = [new THREE.Vector2(R - .02, -H / 2), new THREE.Vector2(R, -H / 2 + .02)];
@@ -233,29 +258,55 @@
     uv.setY(i, (y + H / 2) / H);  // текстура по высоте, а не по точкам профиля (их много в скруглении)
   }
   sideGeo.computeVertexNormals();
-  cake.add(new THREE.Mesh(sideGeo, cream));
+  add(new THREE.Mesh(sideGeo, cream));
 
   // верх с картинкой — плоский круг чуть заходит под скругление
-  const top = new THREE.Mesh(new THREE.CircleGeometry(R - rr + .015, 128),
-    new THREE.MeshBasicMaterial({ map: tex('cake/top.webp') }));
+  const top = add(new THREE.Mesh(new THREE.CircleGeometry(R - rr + .015, 128),
+    new THREE.MeshStandardMaterial({ map: tex('cake/top.webp'), roughness: .6 })), false);
   top.rotation.x = -Math.PI / 2;
   top.position.y = H / 2 + .001;
-  cake.add(top);
-  const base = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshBasicMaterial({ color: 0xb03c85 }));
-  base.rotation.x = Math.PI / 2;
-  base.position.y = -H / 2;
-  cake.add(base);
+
+  // бордюр-«ракушка»: капли крема по кругу, хвост каждой уходит под следующую
+  function shellGeometry() {
+    const g = new THREE.SphereGeometry(1, 20, 14);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const k = .5 + .5 * (p.getX(i) + 1) / 2;   // x: -1 хвост, +1 голова
+      p.setY(i, p.getY(i) * k); p.setZ(i, p.getZ(i) * k);
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+  const shellMat = new THREE.MeshPhysicalMaterial({ color: 0xee64ba, ...creamProps });
+  function border(radius, y, n, size) {
+    const shells = add(new THREE.InstancedMesh(shellGeometry(), shellMat, n));
+    const o = new THREE.Object3D();
+    for (let i = 0; i < n; i++) {
+      const th = i / n * Math.PI * 2, s = size * (.92 + Math.random() * .16);
+      o.position.set(Math.cos(th) * radius, y, Math.sin(th) * radius);
+      o.rotation.set(0, -th - Math.PI / 2, (Math.random() - .5) * .15);  // длинная ось по касательной
+      o.scale.set(s * 1.5, s, s);
+      o.updateMatrix();
+      shells.setMatrixAt(i, o.matrix);
+    }
+  }
+  border(R - .05, H / 2 + .012, 56, .055);
+  border(R + .015, -H / 2 + .05, 60, .06);
+
+  // золотая подложка
+  const board = add(new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, .04, 128),
+    new THREE.MeshStandardMaterial({ color: 0xe2b650, metalness: 1, roughness: .3 })), false);
+  board.position.y = -H / 2 - .02;
 
   // картинка стоит в центре; всё, что ниже поверхности торта, отрезается —
   // так она «выезжает» изнутри
   const hiddenY = H / 2 - TOPPER_H / 2, shownY = H / 2 + TOPPER_H / 2 - .04;
   let topper, riseStart = null;
   tex(TOPPER, t => {
-    topper = new THREE.Mesh(new THREE.PlaneGeometry(TOPPER_H * t.image.width / t.image.height, TOPPER_H),
+    topper = add(new THREE.Mesh(new THREE.PlaneGeometry(TOPPER_H * t.image.width / t.image.height, TOPPER_H),
       new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: .05, side: THREE.DoubleSide,
-        clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), -H / 2)] }));
+        clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), -H / 2)] })), true, false);
     topper.position.y = hiddenY;
-    cake.add(topper);
   });
   const easeOutBack = p => 1 + 2.2 * (p - 1) ** 3 + 1.2 * (p - 1) ** 2;
 
