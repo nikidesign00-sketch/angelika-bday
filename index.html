@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>С днем рождения, Анжелика!</title>
+<title>С днем рождения, зайка!</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
@@ -45,7 +45,7 @@
   h1 {
     position: relative; z-index: 1;
     margin: 0 0 -6vh; padding: 0 16px; text-align: center;
-    font-weight: 400; font-size: clamp(36px, 7vw, 84px); line-height: 1.25;
+    font-weight: 400; font-size: clamp(40px, 7.8vw, 94px); line-height: 1.25;
     text-shadow: 0 4px 24px #ff3d8b99;
     opacity: 0; transform: scale(.8);
     transition: opacity 1s, transform 1s cubic-bezier(.2, 1.6, .4, 1);
@@ -57,7 +57,7 @@
   }
 
   body.cake h1 { opacity: 1; transform: none; }
-  body.cake #cake { transform: none; }
+  body.cake #cake { transform: translateY(12vh); }
 
   @media (prefers-reduced-motion: reduce) {
     #stickers video { animation: none; }
@@ -68,7 +68,7 @@
 <div id="stickers"></div>
 <video id="balloons" muted playsinline preload="auto"></video>
 <main>
-  <h1>С днем рождения, Анжелика!</h1>
+  <h1>С днем рождения, зайка!</h1>
   <canvas id="cake"></canvas>
 </main>
 
@@ -137,9 +137,9 @@
 <script type="module">
   import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
-  const TOPPER = 'cake/topper.png'; // картинка, которая выезжает из торта
+  const TOPPER = 'cake/topper.webp'; // картинка, которая выезжает из торта
   const TOPPER_H = 1;               // её высота
-  const R = 1, H = .83;             // радиус и высота торта
+  const R = 1, H = .88;             // радиус и высота торта
 
   const canvas = document.getElementById('cake');
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
