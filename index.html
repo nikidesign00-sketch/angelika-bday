@@ -143,7 +143,8 @@
 <script type="module">
   import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
-  const TOPPER = 'cake/topper.webp'; // картинка, которая выезжает из торта
+  // картинка, которая выезжает из торта; метка времени — чтобы замена файла была видна сразу, мимо кэша
+  const TOPPER = 'cake/topper.webp?v=' + Date.now();
   const TOPPER_H = .95;             // её высота
   const R = 1, H = .88;             // радиус и высота торта
 
