@@ -47,7 +47,7 @@
 
   #cake {
     position: fixed; z-index: 3; left: 50%; bottom: 0;
-    width: min(70vw, 460px);
+    width: min(80vw, 520px); aspect-ratio: 1;
     transform: translate(-50%, 110%);
     transition: transform 1.4s cubic-bezier(.2, 1.3, .4, 1);
   }
@@ -64,7 +64,7 @@
 <div id="stickers"></div>
 <video id="balloons" muted playsinline preload="auto"></video>
 <h1>С днем рождения, Анжелика!</h1>
-<video id="cake" muted playsinline loop preload="auto"></video>
+<canvas id="cake"></canvas>
 
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script>
@@ -104,16 +104,13 @@
   }
 
   const balloons = document.getElementById('balloons');
-  const cake = document.getElementById('cake');
   balloons.src = `media/balloons.${ext}`;
-  cake.src = `media/cake.${ext}`;
 
   let shown = false;
   function showCake() {
     if (shown) return;
     shown = true;
     balloons.classList.add('gone');
-    cake.play().catch(() => {});
     document.body.classList.add('cake');
     setTimeout(party, 600);
   }
@@ -129,6 +126,61 @@
   if (document.visibilityState == 'visible') start();
   else document.addEventListener('visibilitychange', start, { once: true });
   addEventListener('click', party);
+</script>
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+  // PNG-фото, которые торчат из торта: добавить файлы в cake/ и перечислить здесь
+  const TOPPERS = [];
+  const size = .7;                 // высота фото
+  const PINK = 0xe953b0;           // цвет блёсток с текстуры
+  const R = 1, H = .7;             // радиус и высота торта
+
+  const canvas = document.getElementById('cake');
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, .1, 50);
+  camera.position.set(0, 2.6, 3.8);
+  camera.lookAt(0, .3, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 2);
+  sun.position.set(2, 3, 4);
+  scene.add(sun);
+
+  const loader = new THREE.TextureLoader();
+  const tex = (url, onLoad) => { const t = loader.load(url, onLoad); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+
+  const cake = new THREE.Group();
+  scene.add(cake);
+  // у CylinderGeometry три группы материалов: бок, верх, низ
+  const side = new THREE.MeshStandardMaterial({ color: PINK, roughness: .45 });
+  cake.add(new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 96),
+    [side, new THREE.MeshBasicMaterial({ map: tex('cake/top.webp') }), side]));
+
+  TOPPERS.forEach((url, i) => {
+    // размер по пропорциям картинки, когда она загрузится
+    const t = tex(url, t => m.scale.set(size * t.image.width / t.image.height, size, 1));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: .05, side: THREE.DoubleSide }));
+    const a = i / TOPPERS.length * Math.PI * 2;
+    m.position.set(Math.sin(a) * R * .55, H / 2 + size / 2 - .05, Math.cos(a) * R * .55);
+    m.rotation.y = a;
+    cake.add(m);
+  });
+
+  function resize() {
+    const w = canvas.clientWidth;
+    renderer.setSize(w, w, false);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  renderer.setAnimationLoop(ms => {
+    cake.rotation.y = ms / 1000 * .5;   // рад/с, не зависит от частоты экрана
+    renderer.render(scene, camera);
+  });
 </script>
 </body>
 </html>
