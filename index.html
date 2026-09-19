@@ -168,12 +168,83 @@
   const cake = new THREE.Group();
   scene.add(cake);
 
-  // бок: розовый в цвет блёсток, лаковый блик
-  const side = new THREE.MeshPhysicalMaterial({ color: 0xe953b0, roughness: .55, clearcoat: .6, clearcoatRoughness: .25 });
-  const bottom = new THREE.MeshBasicMaterial({ color: 0xb03c85 });
-  // у CylinderGeometry три группы материалов: бок, верх, низ
-  cake.add(new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 128),
-    [side, new THREE.MeshBasicMaterial({ map: tex('cake/top.webp') }), bottom]));
+  // творожный крем: розовая база, горизонтальные мазки лопатки и зерно.
+  // relief — рельеф (серый), из него же подкрашивается цвет
+  function creamTextures() {
+    const w = 1024, h = 256;
+    const relief = document.createElement('canvas');
+    relief.width = w; relief.height = h;
+    const g = relief.getContext('2d');
+    g.fillStyle = '#808080';
+    g.fillRect(0, 0, w, h);
+    g.lineCap = 'round';
+    g.filter = 'blur(4px)';
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * w, y = Math.random() * h, len = 200 + Math.random() * 500;
+      const bend = (Math.random() - .5) * 10, end = (Math.random() - .5) * 6;
+      const v = Math.random() < .5 ? 255 : 0;
+      g.strokeStyle = `rgba(${v},${v},${v},${.04 + Math.random() * .06})`;
+      g.lineWidth = 10 + Math.random() * 30;
+      for (const dx of [-w, 0, w]) {  // копии по краям — шов по кругу не виден
+        g.beginPath();
+        g.moveTo(x + dx, y);
+        g.quadraticCurveTo(x + dx + len / 2, y + bend, x + dx + len, y + end);
+        g.stroke();
+      }
+    }
+    g.filter = 'none';
+    const img = g.getImageData(0, 0, w, h);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = (Math.random() - .5) * 8;
+      img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
+    }
+    g.putImageData(img, 0, 0);
+
+    const color = document.createElement('canvas');
+    color.width = w; color.height = h;
+    const c = color.getContext('2d');
+    c.fillStyle = '#e953b0';
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'overlay';
+    c.globalAlpha = .35;
+    c.drawImage(relief, 0, 0);
+
+    const map = new THREE.CanvasTexture(color), bump = new THREE.CanvasTexture(relief);
+    map.colorSpace = THREE.SRGBColorSpace;
+    for (const t of [map, bump]) { t.wrapS = THREE.RepeatWrapping; t.repeat.x = 2; t.anisotropy = 8; }
+    return { map, bump };
+  }
+  const { map, bump } = creamTextures();
+  const cream = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.5, roughness: .85 });
+
+  // бок: профиль со скруглённым верхним краем, вращённый вокруг оси
+  const rr = .08, profile = [new THREE.Vector2(R - .02, -H / 2), new THREE.Vector2(R, -H / 2 + .02)];
+  for (let i = 0; i <= 8; i++) {
+    const a = i / 8 * Math.PI / 2;
+    profile.push(new THREE.Vector2(R - rr + Math.cos(a) * rr, H / 2 - rr + Math.sin(a) * rr));
+  }
+  const sideGeo = new THREE.LatheGeometry(profile, 160);
+  // лёгкая неровность, как при ручном выравнивании крема
+  const pos = sideGeo.attributes.position, uv = sideGeo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), th = Math.atan2(z, x);
+    const k = 1 + .006 * Math.sin(3 * th + 1) + .004 * Math.sin(7 * th + y * 6);
+    pos.setX(i, x * k); pos.setZ(i, z * k);
+    uv.setY(i, (y + H / 2) / H);  // текстура по высоте, а не по точкам профиля (их много в скруглении)
+  }
+  sideGeo.computeVertexNormals();
+  cake.add(new THREE.Mesh(sideGeo, cream));
+
+  // верх с картинкой — плоский круг чуть заходит под скругление
+  const top = new THREE.Mesh(new THREE.CircleGeometry(R - rr + .015, 128),
+    new THREE.MeshBasicMaterial({ map: tex('cake/top.webp') }));
+  top.rotation.x = -Math.PI / 2;
+  top.position.y = H / 2 + .001;
+  cake.add(top);
+  const base = new THREE.Mesh(new THREE.CircleGeometry(R, 64), new THREE.MeshBasicMaterial({ color: 0xb03c85 }));
+  base.rotation.x = Math.PI / 2;
+  base.position.y = -H / 2;
+  cake.add(base);
 
   // картинка стоит в центре; всё, что ниже поверхности торта, отрезается —
   // так она «выезжает» изнутри
