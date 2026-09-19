@@ -123,7 +123,7 @@
     party();
     // автоплей запрещён (режим энергосбережения iOS) — сразу к торту
     balloons.play().catch(e => e.name == 'NotAllowedError' && showCake());
-    setTimeout(showCake, 4000);
+    setTimeout(showCake, 5500);
   }
   // в фоновой вкладке браузер ставит видео на паузу — ждём, пока её откроют
   if (document.visibilityState == 'visible') start();
